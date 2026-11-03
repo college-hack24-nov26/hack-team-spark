@@ -1,0 +1,135 @@
+{
+  "info": {
+    "_postman_id": "d78b8b35-4d2f-43f2-9a35-4fa51dc91e9d",
+    "name": "GREYZONE Backend API",
+    "description": "Importable Postman collection for the local GREYZONE simulated cyber-defence API. Run in order: health, safe event, malicious scenario, then the read/acknowledge requests. Starts against http://localhost:5000.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "incidentId", "value": "" },
+    { "key": "alertId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET Health",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/health" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns healthy service', () => {", "  pm.response.to.have.status(200);", "  const body = pm.response.json();", "  pm.expect(body.status).to.eql('ok');", "  pm.expect(body.service).to.eql('greyzone-backend');", "  pm.expect(['demo-detection', 'external-detection']).to.include(body.mode);", "});"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Events and Scenarios",
+      "item": [
+        {
+          "name": "POST Safe Event",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"type\": \"normal_traffic\",\n  \"sourceIp\": \"192.0.2.10\",\n  \"target\": \"demo-server\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/events" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('accepts normal traffic as safe', () => {", "  pm.response.to.have.status(201);", "  const incident = pm.response.json().incident;", "  pm.expect(incident.status).to.eql('safe');", "  pm.expect(incident.severity).to.eql('low');", "  pm.expect(incident.actions).to.have.length(0);", "  pm.expect(incident.alerts).to.have.length(0);", "});"] } }]
+        },
+        {
+          "name": "POST Malicious Scenario (captures IDs)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"scenario\": \"brute_force\",\n  \"sourceIp\": \"198.51.100.7\",\n  \"target\": \"demo-login\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/scenarios" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('detects and simulates containment', () => {", "  pm.response.to.have.status(201);", "  const incident = pm.response.json().incident;", "  pm.expect(incident.event_type).to.eql('brute_force');", "  pm.expect(incident.status).to.eql('contained');", "  pm.expect(incident.severity).to.eql('high');", "  pm.expect(incident.actions).to.have.length(2);", "  pm.expect(incident.alerts).to.have.length(1);", "  pm.collectionVariables.set('incidentId', incident.id);", "  pm.collectionVariables.set('alertId', incident.alerts[0].id);", "});"] } }]
+        },
+        {
+          "name": "POST Invalid Event (invalid IP)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"type\": \"ddos\",\n  \"sourceIp\": \"not-an-ip\",\n  \"target\": \"demo-server\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/events" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('rejects an invalid source IP', () => {", "  pm.response.to.have.status(400);", "  pm.expect(pm.response.json().error).to.eql('Invalid IP address');", "});"] } }]
+        },
+        {
+          "name": "POST Unsupported Scenario (valid IP)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"scenario\": \"sql_injection\",\n  \"sourceIp\": \"198.51.100.50\",\n  \"target\": \"demo-server\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/scenarios" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('reports unsupported scenario independently', () => {", "  pm.response.to.have.status(400);", "  pm.expect(pm.response.json().error).to.eql('Unsupported scenario');", "});"] } }]
+        },
+        {
+          "name": "POST Invalid Event (unsupported type)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"type\": \"unknown_attack\",\n  \"sourceIp\": \"198.51.100.8\",\n  \"target\": \"demo-server\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/events" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('rejects an unsupported event type', () => {", "  pm.response.to.have.status(400);", "  pm.expect(pm.response.json().error).to.eql('Validation failed');", "});"] } }]
+        },
+        {
+          "name": "POST Invalid Scenario (empty target)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"scenario\": \"port_scan\",\n  \"sourceIp\": \"198.51.100.9\",\n  \"target\": \"   \"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/scenarios" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('rejects a blank target', () => {", "  pm.response.to.have.status(400);", "  pm.expect(pm.response.json().error).to.eql('Validation failed');", "});"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Incidents",
+      "item": [
+        {
+          "name": "GET Incidents (limit 10)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/incidents?limit=10" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('lists incidents with a limit', () => {", "  pm.response.to.have.status(200);", "  const body = pm.response.json();", "  pm.expect(body.incidents).to.be.an('array');", "  pm.expect(body.incidents.length).to.be.at.most(10);", "});"] } }]
+        },
+        {
+          "name": "GET Incident Details (captured incidentId)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/incidents/{{incidentId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns incident including actions and alerts', () => {", "  pm.response.to.have.status(200);", "  const incident = pm.response.json().incident;", "  pm.expect(incident.id).to.eql(pm.collectionVariables.get('incidentId'));", "  pm.expect(incident.actions).to.be.an('array');", "  pm.expect(incident.alerts).to.be.an('array');", "});"] } }]
+        },
+        {
+          "name": "GET Incident Details (invalid ID)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/incidents/not-a-uuid" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('rejects malformed incident ID', () => {", "  pm.response.to.have.status(400);", "  pm.expect(pm.response.json().error).to.eql('Invalid incident ID');", "});"] } }]
+        },
+        {
+          "name": "GET Incident Details (not found)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/incidents/00000000-0000-4000-8000-000000000000" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for unknown incident', () => {", "  pm.response.to.have.status(404);", "  pm.expect(pm.response.json().error).to.eql('Incident not found');", "});"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Alerts",
+      "item": [
+        {
+          "name": "GET Alerts",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/alerts" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('lists alerts and contains the generated alert', () => {", "  pm.response.to.have.status(200);", "  const alerts = pm.response.json().alerts;", "  pm.expect(alerts).to.be.an('array');", "  pm.expect(alerts.some(alert => alert.id === pm.collectionVariables.get('alertId'))).to.eql(true);", "});"] } }]
+        },
+        {
+          "name": "PATCH Acknowledge Alert (captured alertId)",
+          "request": { "method": "PATCH", "header": [], "url": "{{baseUrl}}/api/alerts/{{alertId}}/acknowledge" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('acknowledges the generated alert', () => {", "  pm.response.to.have.status(200);", "  pm.expect(pm.response.json().success).to.eql(true);", "});"] } }]
+        },
+        {
+          "name": "PATCH Acknowledge Alert (invalid ID)",
+          "request": { "method": "PATCH", "header": [], "url": "{{baseUrl}}/api/alerts/not-a-uuid/acknowledge" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('rejects malformed alert ID', () => {", "  pm.response.to.have.status(400);", "  pm.expect(pm.response.json().error).to.eql('Invalid alert ID');", "});"] } }]
+        },
+        {
+          "name": "PATCH Acknowledge Alert (not found)",
+          "request": { "method": "PATCH", "header": [], "url": "{{baseUrl}}/api/alerts/00000000-0000-4000-8000-000000000000/acknowledge" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for unknown alert', () => {", "  pm.response.to.have.status(404);", "  pm.expect(pm.response.json().error).to.eql('Alert not found');", "});"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Dashboard and Blocklist",
+      "item": [
+        {
+          "name": "GET Status",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/status" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('reports simulated status counters', () => {", "  pm.response.to.have.status(200);", "  const body = pm.response.json();", "  pm.expect(body.simulation).to.eql(true);", "  pm.expect(body.totalIncidents).to.be.a('number');", "  pm.expect(body.containedIncidents).to.be.a('number');", "  pm.expect(body.activeAlerts).to.be.a('number');", "  pm.expect(body.blockedSources).to.be.a('number');", "});"] } }]
+        },
+        {
+          "name": "GET Blocked Sources",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/blocked-sources" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('lists simulated blocked sources', () => {", "  pm.response.to.have.status(200);", "  const body = pm.response.json();", "  pm.expect(body.simulation).to.eql(true);", "  pm.expect(body.sources).to.be.an('array');", "  pm.expect(body.sources.some(source => source.source_ip === '198.51.100.7')).to.eql(true);", "});"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Routing",
+      "item": [
+        {
+          "name": "GET Unknown Route",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/does-not-exist" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns JSON 404 for unknown route', () => {", "  pm.response.to.have.status(404);", "  pm.expect(pm.response.json().error).to.eql('Route not found');", "});"] } }]
+        }
+      ]
+    }
+  ]
+}
