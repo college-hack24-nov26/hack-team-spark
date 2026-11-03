@@ -2,11 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-body { @apply bg-fog text-ink font-sans; margin: 0; }
-button:focus-visible, select:focus-visible { outline: 2px solid #3B5B7A; outline-offset: 2px; }
-@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(192,57,43,.5); } 100% { box-shadow: 0 0 0 16px rgba(192,57,43,0); } }
-.pulse-threat { animation: pulse-ring 1.1s ease-out infinite; }
-@media (prefers-reduced-motion: reduce) { .pulse-threat { animation: none; } }
+body {
+  background: #0b1220;
+  color: #f8fafc;
+  @apply font-sans;
+  margin: 0;
+}
 /* SIDEBAR */
 
 .sidebar {
@@ -2854,4 +2855,83 @@ button:focus-visible, select:focus-visible { outline: 2px solid #3B5B7A; outline
   .incident-detail-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* =====================================
+   OVERVIEW DASHBOARD - DARK THEME FIX
+===================================== */
+
+.page-content {
+  background: #0b1220;
+  color: #f8fafc;
+}
+
+.system-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.system-status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 0;
+  border-bottom: 1px solid #263449;
+  color: #cbd5e1;
+}
+
+.system-status-item:last-child {
+  border-bottom: none;
+}
+
+.system-status-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #38bdf8;
+  min-width: 0;
+}
+
+.system-status-left strong {
+  display: block;
+  color: #e2e8f0;
+  font-size: 12px;
+}
+
+.system-status-left span {
+  display: block;
+  color: #94a3b8;
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+.status-pill.operational {
+  color: #4ade80;
+  background: #12352c;
+}
+
+.status-pill.monitoring {
+  color: #fbbf24;
+  background: #3b3020;
+}
+
+.status-pill {
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.system-panel-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #263449;
+  color: #38bdf8;
+  font-size: 11px;
 }

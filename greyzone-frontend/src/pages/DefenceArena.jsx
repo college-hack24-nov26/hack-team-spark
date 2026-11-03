@@ -1,194 +1,236 @@
+
 import { useState } from "react";
 
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
+  ShieldCheck,
+  ShieldAlert,
+  Activity,
+  Server,
+  AlertTriangle,
+  Play,
+  RotateCcw,
+  CheckCircle,
+  Network,
+  Zap,
+  Bug,
+  Scan,
+  UserX,
+  LoaderCircle,
+} from "lucide-react";
 
-const scenarios = [
-  {
-    id: 1,
-    name: "Unusual Network Activity",
-    target: "Bunker 01",
-    risk: 78,
-    disruption: 25,
-    severity: "High",
-    description:
-      "Unusual activity detected in a simulated network component.",
-  },
-  {
-    id: 2,
-    name: "Suspicious Access Pattern",
-    target: "Core Gateway",
-    risk: 52,
-    disruption: 15,
-    severity: "Medium",
-    description:
-      "An unusual access pattern has been identified in the simulation.",
-  },
-  {
-    id: 3,
-    name: "Unknown Device Detected",
-    target: "Bunker 03",
-    risk: 30,
-    disruption: 8,
-    severity: "Low",
-    description:
-      "An unfamiliar device has appeared in the fictional network.",
-  },
-];
+import { api, THREAT_SCENARIOS } from "../api";
+
+const iconMap = {
+  activity: Activity,
+  scan: Scan,
+  "shield-alert": ShieldAlert,
+  zap: Zap,
+  "user-x": UserX,
+  bug: Bug,
+};
 
 function DefenceArena() {
-  const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
-  const [results, setResults] = useState(null);
+  const [selectedScenario, setSelectedScenario] = useState(
+    THREAT_SCENARIOS[0]
+  );
+
+  const [result, setResult] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [error, setError] = useState("");
 
-  const runComparison = () => {
+  const runDefenceAnalysis = async () => {
     setIsRunning(true);
-    setResults(null);
+    setResult(null);
+    setError("");
 
-    setTimeout(() => {
-      const fullIsolation = {
-        strategy: "Full Isolation",
-        residualRisk: Math.max(5, selectedScenario.risk - 45),
-        disruption: 75,
-      };
+    try {
+      const incident = await api.runScenario({
+        scenario: selectedScenario.id,
+        target: selectedScenario.target,
+      });
 
-      const selectiveRestrictions = {
-        strategy: "Selective Restrictions",
-        residualRisk: Math.max(10, selectedScenario.risk - 25),
-        disruption: selectedScenario.disruption,
-      };
-
-      setResults([fullIsolation, selectiveRestrictions]);
+      setResult(incident);
+    } catch (err) {
+      setError(err.message || "Defence analysis failed.");
+    } finally {
       setIsRunning(false);
-    }, 1200);
+    }
   };
 
-  const resetSimulation = () => {
-    setResults(null);
-    setIsRunning(false);
-    setSelectedScenario(scenarios[0]);
+  const resetAnalysis = () => {
+    setResult(null);
+    setError("");
   };
 
-  const recommendedStrategy = results
-    ? results.reduce((best, current) => {
-        const bestScore = best.residualRisk + best.disruption;
-        const currentScore = current.residualRisk + current.disruption;
+  const containment = result?.containment;
+  const network = result?.network_state;
 
-        return currentScore < bestScore ? current : best;
-      })
-    : null;
+  const verificationLabel =
+    containment?.success === true
+      ? "SUCCESSFUL"
+      : containment?.success === false
+        ? "FAILED"
+        : "NOT REQUIRED";
 
-  const chartData = results
-    ? results.map((item) => ({
-        name: item.strategy,
-        "Residual Risk": item.residualRisk,
-        "Service Disruption": item.disruption,
-      }))
-    : [];
+  const formatStatus = (status) => {
+    if (!status) return "UNKNOWN";
+    return status.replaceAll("_", " ").toUpperCase();
+  };
 
   return (
     <div className="defence-arena">
       {/* HEADER */}
+
       <div className="arena-header">
         <div>
           <p className="arena-eyebrow">GREYZONE / RESPONSE LAB</p>
+
           <h1>Defence Arena</h1>
+
           <p className="arena-subtitle">
-            Compare defensive strategies in a controlled simulation.
+            Analyse automated cyber defence responses using the
+            GREYZONE Python NetworkX engine.
           </p>
         </div>
 
         <div className="arena-mode-badge">
           <span className="arena-live-dot"></span>
-          SIMULATION MODE
+          DEFENCE ANALYSIS
+        </div>
+      </div>
+
+      {/* SUMMARY */}
+
+      <div className="simulation-stats">
+        <div className="simulation-stat-card">
+          <div className="simulation-stat-icon">
+            <Activity size={22} />
+          </div>
+
+          <div>
+            <p>Attack Scenarios</p>
+            <h2>{THREAT_SCENARIOS.length}</h2>
+          </div>
+        </div>
+
+        <div className="simulation-stat-card">
+          <div className="simulation-stat-icon">
+            <Network size={22} />
+          </div>
+
+          <div>
+            <p>Defence Engine</p>
+            <h2>NetworkX</h2>
+          </div>
+        </div>
+
+        <div className="simulation-stat-card">
+          <div className="simulation-stat-icon">
+            <ShieldCheck size={22} />
+          </div>
+
+          <div>
+            <p>Analysis Status</p>
+            <h2>{isRunning ? "Running" : "Ready"}</h2>
+          </div>
         </div>
       </div>
 
       {/* SCENARIO SELECTION */}
+
       <section className="arena-section">
         <div className="arena-section-heading">
           <div>
             <h2>Select Threat Scenario</h2>
-            <p>Choose a fictional event to evaluate.</p>
+            <p>
+              Choose an attack scenario supported by the backend.
+            </p>
           </div>
         </div>
 
         <div className="arena-scenario-grid">
-          {scenarios.map((scenario) => (
-            <button
-              key={scenario.id}
-              className={`arena-scenario-card ${
-                selectedScenario.id === scenario.id ? "active" : ""
-              }`}
-              onClick={() => {
-                setSelectedScenario(scenario);
-                setResults(null);
-              }}
-            >
-              <div className="arena-card-top">
-                <span className="arena-card-label">SCENARIO 0{scenario.id}</span>
+          {THREAT_SCENARIOS.map((scenario, index) => {
+            const Icon = iconMap[scenario.icon] || Activity;
 
-                <span
-                  className={`arena-severity ${scenario.severity.toLowerCase()}`}
-                >
-                  {scenario.severity}
-                </span>
-              </div>
+            return (
+              <button
+                key={scenario.id}
+                className={`arena-scenario-card ${
+                  selectedScenario.id === scenario.id ? "active" : ""
+                }`}
+                onClick={() => {
+                  setSelectedScenario(scenario);
+                  setResult(null);
+                  setError("");
+                }}
+                disabled={isRunning}
+              >
+                <div className="arena-card-top">
+                  <span className="arena-card-label">
+                    SCENARIO {String(index + 1).padStart(2, "0")}
+                  </span>
 
-              <h3>{scenario.name}</h3>
-
-              <p>{scenario.description}</p>
-
-              <div className="arena-scenario-metrics">
-                <span>Target</span>
-                <strong>{scenario.target}</strong>
-              </div>
-
-              <div className="arena-scenario-metrics">
-                <span>Initial Risk</span>
-                <strong>{scenario.risk}/100</strong>
-              </div>
-
-              {selectedScenario.id === scenario.id && (
-                <div className="arena-selected-label">
-                  ✓ SELECTED
+                  <span
+                    className={`arena-severity ${scenario.severity.toLowerCase()}`}
+                  >
+                    {scenario.severity}
+                  </span>
                 </div>
-              )}
-            </button>
-          ))}
+
+                <div style={{ margin: "12px 0" }}>
+                  <Icon size={24} />
+                </div>
+
+                <h3>{scenario.name}</h3>
+
+                <p>{scenario.description}</p>
+
+                <div className="arena-scenario-metrics">
+                  <span>Target</span>
+                  <strong>{scenario.target}</strong>
+                </div>
+
+                {selectedScenario.id === scenario.id && (
+                  <div className="arena-selected-label">
+                    ✓ SELECTED
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
       </section>
 
       {/* SELECTED SCENARIO */}
+
       <section className="arena-selected-panel">
         <div>
           <span className="arena-panel-label">SELECTED SCENARIO</span>
+
           <h3>{selectedScenario.name}</h3>
+
           <p>
             Target: <strong>{selectedScenario.target}</strong>
+          </p>
+
+          <p>
+            Scenario ID: <strong>{selectedScenario.id}</strong>
           </p>
         </div>
 
         <div className="arena-risk-box">
-          <span>Initial Risk Score</span>
-          <strong>{selectedScenario.risk}/100</strong>
+          <span>Execution Mode</span>
+          <strong>Python Engine</strong>
         </div>
       </section>
 
-      {/* STRATEGIES */}
+      {/* DEFENCE CAPABILITIES */}
+
       <section className="arena-section">
         <div className="arena-section-heading">
           <div>
-            <h2>Defence Strategies</h2>
-            <p>Evaluate two response approaches.</p>
+            <h2>Defence Capabilities</h2>
+            <p>Operations performed by the existing backend.</p>
           </div>
         </div>
 
@@ -198,16 +240,15 @@ function DefenceArena() {
               01
             </div>
 
-            <h3>Full Isolation</h3>
+            <h3>Network Isolation Simulation</h3>
 
             <p>
-              Completely isolates the selected simulated component.
-              This approach prioritizes risk reduction but may affect
-              service availability.
+              The NetworkX engine simulates isolating the affected
+              network component by removing its graph connections.
             </p>
 
             <div className="arena-strategy-tag">
-              HIGH SERVICE DISRUPTION
+              GRAPH-BASED ISOLATION
             </div>
           </div>
 
@@ -216,200 +257,310 @@ function DefenceArena() {
               02
             </div>
 
-            <h3>Selective Restrictions</h3>
+            <h3>Containment Verification</h3>
 
             <p>
-              Applies limited simulated restrictions while attempting
-              to preserve essential services.
+              The engine checks whether the simulated attacker
+              can still reach the affected target after isolation.
             </p>
 
             <div className="arena-strategy-tag">
-              SERVICE CONTINUITY FOCUSED
+              REACHABILITY VERIFICATION
             </div>
           </div>
         </div>
       </section>
 
-      {/* ACTION BUTTONS */}
+      {/* ACTIONS */}
+
       <div className="arena-actions">
         <button
           className="arena-run-button"
-          onClick={runComparison}
+          onClick={runDefenceAnalysis}
           disabled={isRunning}
         >
-          {isRunning ? "Comparing Strategies..." : "▶ Run Defence Comparison"}
+          {isRunning ? (
+            <>
+              <LoaderCircle size={18} />
+              Analysing Threat...
+            </>
+          ) : (
+            <>
+              <Play size={18} />
+              Run Defence Analysis
+            </>
+          )}
         </button>
 
         <button
           className="arena-reset-button"
-          onClick={resetSimulation}
+          onClick={resetAnalysis}
+          disabled={isRunning}
         >
-          ↻ Reset
+          <RotateCcw size={17} />
+          Reset
         </button>
       </div>
 
-      {/* LOADING */}
-      {isRunning && (
-        <div className="arena-loading">
-          <div className="arena-spinner"></div>
-          <p>Evaluating simulated defence strategies...</p>
+      {/* ERROR */}
+
+      {error && (
+        <div className="arena-disclaimer">
+          <AlertTriangle size={18} />
+          <div>
+            <strong>Analysis Failed</strong>
+            <p>{error}</p>
+          </div>
         </div>
       )}
 
-      {/* RESULTS */}
-      {results && (
+      {/* ACTUAL RESULTS */}
+
+      {result && (
         <section className="arena-results">
           <div className="arena-section-heading">
             <div>
-              <h2>Comparison Results</h2>
-              <p>Illustrative outcomes from the selected scenario.</p>
+              <h2>Defence Analysis Results</h2>
+              <p>Actual results returned by the GREYZONE backend.</p>
             </div>
 
             <span className="arena-completed-badge">
-              ✓ ANALYSIS COMPLETE
+              <CheckCircle size={15} />
+              RESPONSE RECEIVED
             </span>
           </div>
+
+          {/* THREAT SUMMARY */}
 
           <div className="arena-result-grid">
-            {results.map((item) => (
-              <div className="arena-result-card" key={item.strategy}>
-                <h3>{item.strategy}</h3>
+            <div className="arena-result-card">
+              <h3>Threat Score</h3>
 
-                <div className="arena-result-metric">
-                  <span>Residual Risk</span>
-                  <strong>{item.residualRisk}/100</strong>
-                </div>
-
-                <div className="arena-progress-track">
-                  <div
-                    className="arena-progress-fill risk-fill"
-                    style={{ width: `${item.residualRisk}%` }}
-                  ></div>
-                </div>
-
-                <div className="arena-result-metric">
-                  <span>Service Disruption</span>
-                  <strong>{item.disruption}/100</strong>
-                </div>
-
-                <div className="arena-progress-track">
-                  <div
-                    className="arena-progress-fill disruption-fill"
-                    style={{ width: `${item.disruption}%` }}
-                  ></div>
-                </div>
-
-                <p className="arena-score-note">
-                  Combined illustrative score:{" "}
-                  <strong>
-                    {item.residualRisk + item.disruption}
-                  </strong>
-                </p>
-
-                {recommendedStrategy.strategy === item.strategy && (
-                  <div className="arena-recommended-tag">
-                    ★ RECOMMENDED STRATEGY
-                  </div>
-                )}
+              <div className="arena-result-metric">
+                <span>Detection Score</span>
+                <strong>{result.score}/100</strong>
               </div>
-            ))}
-          </div>
 
-          {/* PERFORMANCE CHART */}
-          <div className="arena-chart-card">
-            <div className="arena-chart-heading">
-              <h3>Strategy Performance</h3>
-              <p>Residual risk versus service disruption</p>
-            </div>
-
-            <div className="arena-chart-container">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  margin={{
-                    top: 15,
-                    right: 20,
-                    left: 0,
-                    bottom: 10,
+              <div className="arena-progress-track">
+                <div
+                  className="arena-progress-fill risk-fill"
+                  style={{
+                    width: `${result.score}%`,
                   }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#263449"
-                  />
+                />
+              </div>
 
-                  <XAxis
-                    dataKey="name"
-                    stroke="#94a3b8"
-                    tick={{ fill: "#cbd5e1", fontSize: 12 }}
-                  />
+              <p className="arena-score-note">
+                Severity: <strong>{result.severity?.toUpperCase()}</strong>
+              </p>
+            </div>
 
-                  <YAxis
-                    domain={[0, 100]}
-                    stroke="#94a3b8"
-                    tick={{ fill: "#cbd5e1" }}
-                  />
+            <div className="arena-result-card">
+              <h3>Containment Verification</h3>
 
-                  <Tooltip
-                    contentStyle={{
-                      background: "#111c2e",
-                      border: "1px solid #334155",
-                      borderRadius: "10px",
-                      color: "#ffffff",
-                    }}
-                  />
+              <div className="arena-result-metric">
+                <span>Verification</span>
+                <strong>{verificationLabel}</strong>
+              </div>
 
-                  <Legend />
+              <div className="arena-progress-track">
+                <div
+                  className="arena-progress-fill disruption-fill"
+                  style={{
+                    width: containment?.success === true ? "100%" : "0%",
+                  }}
+                />
+              </div>
 
-                  <Bar
-                    dataKey="Residual Risk"
-                    fill="#38bdf8"
-                    radius={[5, 5, 0, 0]}
-                  />
-
-                  <Bar
-                    dataKey="Service Disruption"
-                    fill="#f59e0b"
-                    radius={[5, 5, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <p className="arena-score-note">
+                Incident status: <strong>{formatStatus(result.status)}</strong>
+              </p>
             </div>
           </div>
 
-          {/* RECOMMENDATION */}
+          {/* INCIDENT INFORMATION */}
+
           <div className="arena-recommendation-panel">
             <span className="arena-panel-label">
-              SYSTEM RECOMMENDATION
+              DETECTION ANALYSIS
             </span>
 
-            <h3>{recommendedStrategy.strategy}</h3>
+            <h3>{result.event_type?.replaceAll("_", " ")}</h3>
+
+            <p>{result.reason}</p>
 
             <p>
-              Based on the illustrative combined score of residual risk
-              and service disruption, this strategy offers the better
-              balance in the current simulation.
+              <strong>Incident ID:</strong> {result.id}
             </p>
 
-            <div className="arena-recommendation-score">
-              Combined Score:{" "}
-              <strong>
-                {recommendedStrategy.residualRisk +
-                  recommendedStrategy.disruption}
-              </strong>
+            <p>
+              <strong>Source IP:</strong> {result.source_ip}
+            </p>
+
+            <p>
+              <strong>Target:</strong> {result.target}
+            </p>
+          </div>
+
+          {/* CONTAINMENT */}
+
+          <div className="arena-chart-card">
+            <div className="arena-chart-heading">
+              <h3>
+                <ShieldCheck size={19} />
+                Python Containment Report
+              </h3>
+              <p>Network isolation and verification results.</p>
+            </div>
+
+            {containment ? (
+              <div style={{ padding: "18px", color: "#e2e8f0" }}>
+                <p>
+                  Isolation required:{" "}
+                  <strong>{containment.required ? "Yes" : "No"}</strong>
+                </p>
+
+                <p>
+                  Isolation attempted:{" "}
+                  <strong>{containment.attempted ? "Yes" : "No"}</strong>
+                </p>
+
+                <p>
+                  Isolation verification: <strong>{verificationLabel}</strong>
+                </p>
+
+                <p>
+                  Isolated node:{" "}
+                  <strong>{containment.isolated_node || "None"}</strong>
+                </p>
+
+                <h4 style={{ marginTop: "20px" }}>Blocked Network Paths</h4>
+
+                {containment.blocked_paths?.length ? (
+                  containment.blocked_paths.map((path, index) => (
+                    <p key={index}>
+                      {path[0]} → {path[1]}
+                    </p>
+                  ))
+                ) : (
+                  <p>No blocked paths recorded.</p>
+                )}
+              </div>
+            ) : (
+              <p style={{ padding: "18px" }}>
+                Containment information unavailable.
+              </p>
+            )}
+          </div>
+
+          {/* NETWORK STATE */}
+
+          {network && (
+            <div className="arena-chart-card">
+              <div className="arena-chart-heading">
+                <h3>
+                  <Network size={19} />
+                  Network Reachability Analysis
+                </h3>
+                <p>Network state returned by the Python engine.</p>
+              </div>
+
+              <div style={{ padding: "18px", color: "#e2e8f0" }}>
+                <p>
+                  <strong>Affected nodes:</strong>{" "}
+                  {network.affected_nodes.join(", ") || "None"}
+                </p>
+
+                <p>
+                  <strong>Reachable services:</strong>{" "}
+                  {network.reachable_services.join(", ") || "None"}
+                </p>
+
+                <p>
+                  <strong>Unreachable services:</strong>{" "}
+                  {network.unreachable_services.join(", ") || "None"}
+                </p>
+
+                <p>
+                  <strong>Attacker can reach target:</strong>{" "}
+                  {network.attacker_can_reach_target === undefined
+                    ? "Not reported"
+                    : network.attacker_can_reach_target
+                      ? "Yes"
+                      : "No"}
+                </p>
+
+                <p>
+                  <strong>Remaining risk:</strong>{" "}
+                  {network.remaining_risk ? "Present" : "Not detected"}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ACTIONS */}
+
+          <div className="arena-chart-card">
+            <div className="arena-chart-heading">
+              <h3>
+                <CheckCircle size={19} />
+                Recorded Defence Actions
+              </h3>
+              <p>Actions persisted by the backend.</p>
+            </div>
+
+            <div style={{ padding: "18px", color: "#e2e8f0" }}>
+              {result.actions?.length ? (
+                result.actions.map((action) => (
+                  <div key={action.id} style={{ marginBottom: "16px" }}>
+                    <strong>{action.action_type}</strong>
+                    <p>Status: {action.status}</p>
+                    <p>{action.details}</p>
+                  </div>
+                ))
+              ) : (
+                <p>No defence actions recorded.</p>
+              )}
             </div>
           </div>
+
+          {/* ALERTS */}
+
+          {result.alerts?.length > 0 && (
+            <div className="arena-chart-card">
+              <div className="arena-chart-heading">
+                <h3>
+                  <AlertTriangle size={19} />
+                  Security Alerts
+                </h3>
+              </div>
+
+              <div style={{ padding: "18px", color: "#e2e8f0" }}>
+                {result.alerts.map((alert) => (
+                  <p key={alert.id}>
+                    {alert.message}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
       {/* DISCLAIMER */}
+
       <div className="arena-disclaimer">
-        <strong>Simulation Disclaimer</strong>
-        <p>
-          All scenarios, scores and outcomes are fictional demonstration
-          data. The scoring formula is illustrative, not a validated
-          cybersecurity model. No real network is accessed or controlled.
-        </p>
+        <AlertTriangle size={18} />
+
+        <div>
+          <strong>Controlled Simulation Environment</strong>
+          <p>
+            All results are returned by the GREYZONE backend.
+            Network isolation and containment verification are
+            graph simulations. No real network infrastructure
+            or operating-system firewall is controlled.
+          </p>
+        </div>
       </div>
     </div>
   );

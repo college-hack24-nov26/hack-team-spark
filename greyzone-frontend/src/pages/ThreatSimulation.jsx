@@ -1,5 +1,5 @@
-import { useState } from "react";
 
+import { useState } from "react";
 import {
   ShieldAlert,
   ShieldCheck,
@@ -10,370 +10,694 @@ import {
   RotateCcw,
   CheckCircle,
   Clock,
-  Lock,
+  Bug,
+  Scan,
   Zap,
+  UserX,
+  LoaderCircle,
+  Network,
+  Target,
+  Radio,
+  Lock,
+  ArrowRight,
+  Terminal,
 } from "lucide-react";
 
-const scenarios = [
-  {
-    id: 1,
-    name: "Unusual Network Activity",
-    description:
-      "Simulates unusual activity detected in a fictional network component.",
-    severity: "High",
-    target: "Bunker 01",
-    risk: 78,
-    disruption: 25,
-    icon: Activity,
-  },
-  {
-    id: 2,
-    name: "Suspicious Access Pattern",
-    description:
-      "Simulates an unexpected access pattern involving the core gateway.",
-    severity: "Medium",
-    target: "Core Gateway",
-    risk: 52,
-    disruption: 15,
-    icon: ShieldAlert,
-  },
-  {
-    id: 3,
-    name: "Unknown Device Detected",
-    description:
-      "Simulates an unidentified device appearing in the fictional network.",
-    severity: "Low",
-    target: "Bunker 03",
-    risk: 30,
-    disruption: 8,
-    icon: Server,
-  },
-];
+import { api, THREAT_SCENARIOS } from "../api";
+import "./ThreatSimulation.css";
+
+const iconMap = {
+  activity: Activity,
+  scan: Scan,
+  "shield-alert": ShieldAlert,
+  zap: Zap,
+  "user-x": UserX,
+  bug: Bug,
+};
+
+const targetNames = {
+  "demo-login": "Demo Login",
+  internet_gateway: "Internet Gateway",
+  firewall: "Firewall",
+  web_server: "Web Server",
+  app_server: "Application Server",
+  auth_server: "Authentication Server",
+  database_server: "Database Server",
+  monitoring_server: "Monitoring Server",
+};
+
+const formatTarget = (target) =>
+  targetNames[target] || target || "Not specified";
+
+const formatLabel = (value) =>
+  String(value || "Unknown")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const formatTime = (value) => {
+  if (!value) return "Unavailable";
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? "Unavailable"
+    : date.toLocaleString();
+};
 
 function ThreatSimulation() {
-  const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
-  const [strategy, setStrategy] = useState("selective");
+  const [selectedScenario, setSelectedScenario] = useState(
+    THREAT_SCENARIOS[0]
+  );
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
 
-  const runSimulation = () => {
+  const runSimulation = async () => {
     setIsRunning(true);
     setResult(null);
+    setError("");
 
-    setTimeout(() => {
-      let residualRisk;
-      let disruption;
-
-      if (strategy === "full") {
-        residualRisk = Math.max(5, selectedScenario.risk - 45);
-        disruption = 75;
-      } else {
-        residualRisk = Math.max(10, selectedScenario.risk - 25);
-        disruption = selectedScenario.disruption;
-      }
-
-      setResult({
-        residualRisk,
-        disruption,
-        strategy:
-          strategy === "full"
-            ? "Full Isolation"
-            : "Selective Restrictions",
+    try {
+      const incident = await api.runScenario({
+        scenario: selectedScenario.id,
+        target: selectedScenario.target,
       });
 
+      setResult(incident);
+    } catch (err) {
+      setError(err.message || "Unable to execute the simulation.");
+    } finally {
       setIsRunning(false);
-    }, 1500);
+    }
   };
 
   const resetSimulation = () => {
     setResult(null);
-    setIsRunning(false);
-    setStrategy("selective");
+    setError("");
   };
 
+  const containment = result?.containment;
+  const network = result?.network_state;
+
+  const severity = formatLabel(result?.severity);
+
+  const blockedPaths = Array.isArray(containment?.blocked_paths)
+    ? containment.blocked_paths
+    : [];
+
+  const affectedNodes = Array.isArray(network?.affected_nodes)
+    ? network.affected_nodes
+    : [];
+
+  const reachableServices = Array.isArray(network?.reachable_services)
+    ? network.reachable_services
+    : [];
+
+  const unreachableServices = Array.isArray(network?.unreachable_services)
+    ? network.unreachable_services
+    : [];
+
   return (
-    <div className="simulation-page">
-      <div className="page-heading">
+    <div className="ts-page">
+
+      {/* PAGE HEADER */}
+
+      <header className="ts-header">
         <div>
+          <div className="ts-eyebrow">
+            <span className="ts-live-dot" />
+            GREYZONE / THREAT LAB
+          </div>
+
           <h1>Threat Simulation</h1>
+
           <p>
-            Run controlled scenarios and evaluate defensive response
-            strategies.
+            Execute controlled cyber threat scenarios and analyse
+            automated defence responses using the Python engine.
           </p>
         </div>
 
-        <div className="simulation-status">
-          <span className="status-dot"></span>
-          SIMULATION MODE
+        <div className="ts-engine-badge">
+          <Network size={19} />
+          <div>
+            <strong>PYTHON ENGINE</strong>
+            <span>NetworkX Simulation</span>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Summary cards */}
+      {/* TOP METRICS */}
 
-      <div className="simulation-stats">
-        <div className="simulation-stat-card">
-          <div className="simulation-stat-icon">
-            <Activity size={22} />
+      <section className="ts-metrics">
+
+        <div className="ts-metric">
+          <div className="ts-metric-icon cyan">
+            <Target size={21} />
           </div>
           <div>
-            <p>Available Scenarios</p>
-            <h2>03</h2>
+            <span>Available Scenarios</span>
+            <strong>
+              {String(THREAT_SCENARIOS.length).padStart(2, "0")}
+            </strong>
+            <small>Supported threat types</small>
           </div>
         </div>
 
-        <div className="simulation-stat-card">
-          <div className="simulation-stat-icon">
-            <ShieldCheck size={22} />
+        <div className="ts-metric">
+          <div className="ts-metric-icon blue">
+            <Network size={21} />
           </div>
           <div>
-            <p>Response Strategies</p>
-            <h2>02</h2>
+            <span>Defence Engine</span>
+            <strong>NetworkX</strong>
+            <small>Python graph simulation</small>
           </div>
         </div>
 
-        <div className="simulation-stat-card">
-          <div className="simulation-stat-icon">
-            <Clock size={22} />
+        <div className="ts-metric">
+          <div className="ts-metric-icon green">
+            <Activity size={21} />
           </div>
           <div>
-            <p>Simulation Status</p>
-            <h2>{isRunning ? "Running" : "Ready"}</h2>
+            <span>Execution Status</span>
+            <strong>{isRunning ? "Running" : "Ready"}</strong>
+            <small>
+              {isRunning ? "Processing scenario" : "Awaiting execution"}
+            </small>
           </div>
         </div>
-      </div>
 
-      {/* Scenario selection */}
-
-      <section className="simulation-section">
-        <div className="section-heading">
+        <div className="ts-metric">
+          <div className="ts-metric-icon purple">
+            <Radio size={21} />
+          </div>
           <div>
-            <h2>Select a Scenario</h2>
-            <p>Choose a predefined fictional threat event.</p>
+            <span>Connection</span>
+            <strong>Backend API</strong>
+            <small>Scenario execution endpoint</small>
           </div>
         </div>
 
-        <div className="scenario-grid">
-          {scenarios.map((scenario) => {
-            const ScenarioIcon = scenario.icon;
+      </section>
+
+      {/* SCENARIO SELECTOR */}
+
+      <section className="ts-section">
+
+        <div className="ts-section-heading">
+          <div>
+            <div className="ts-section-label">01 / SCENARIO SELECTION</div>
+            <h2>Choose an Attack Scenario</h2>
+            <p>
+              Select a threat to execute through the GREYZONE defence engine.
+            </p>
+          </div>
+
+          <span className="ts-count">
+            {THREAT_SCENARIOS.length} SCENARIOS
+          </span>
+        </div>
+
+        <div className="ts-scenario-grid">
+
+          {THREAT_SCENARIOS.map((scenario, index) => {
+            const ScenarioIcon = iconMap[scenario.icon] || Activity;
+            const selected = selectedScenario.id === scenario.id;
 
             return (
               <button
+                type="button"
                 key={scenario.id}
-                className={`scenario-card ${
-                  selectedScenario.id === scenario.id ? "selected" : ""
-                }`}
+                className={`ts-scenario-card ${selected ? "selected" : ""}`}
                 onClick={() => {
                   setSelectedScenario(scenario);
                   setResult(null);
+                  setError("");
                 }}
                 disabled={isRunning}
               >
-                <div className="scenario-card-top">
-                  <div className="scenario-icon">
+                <div className="ts-card-top">
+                  <div className="ts-scenario-icon">
                     <ScenarioIcon size={23} />
                   </div>
 
                   <span
-                    className={`severity-badge ${scenario.severity.toLowerCase()}`}
+                    className={`ts-severity ${String(
+                      scenario.severity
+                    ).toLowerCase()}`}
                   >
                     {scenario.severity}
                   </span>
                 </div>
 
-                <h3>{scenario.name}</h3>
-                <p>{scenario.description}</p>
-
-                <div className="scenario-target">
-                  <Server size={15} />
-                  Target: {scenario.target}
+                <div className="ts-scenario-number">
+                  SCENARIO {String(index + 1).padStart(2, "0")}
                 </div>
 
-                <div className="scenario-select">
-                  {selectedScenario.id === scenario.id ? (
+                <h3>{scenario.name}</h3>
+
+                <p>{scenario.description}</p>
+
+                <div className="ts-target">
+                  <Server size={15} />
+                  <span>Target</span>
+                  <strong>{formatTarget(scenario.target)}</strong>
+                </div>
+
+                <div className="ts-card-footer">
+                  {selected ? (
                     <>
                       <CheckCircle size={16} />
-                      Selected
+                      Selected Scenario
                     </>
                   ) : (
-                    "Select Scenario"
+                    <>
+                      Select Scenario
+                      <ArrowRight size={15} />
+                    </>
                   )}
                 </div>
               </button>
             );
           })}
+
         </div>
       </section>
 
-      {/* Response strategy */}
+      {/* SELECTED SCENARIO */}
 
-      <section className="simulation-section">
-        <div className="section-heading">
-          <div>
-            <h2>Choose Defence Strategy</h2>
-            <p>Compare two simulated containment approaches.</p>
+      <section className="ts-selected-panel">
+
+        <div className="ts-selected-info">
+          <div className="ts-section-label">02 / EXECUTION CONFIGURATION</div>
+
+          <h2>{selectedScenario.name}</h2>
+
+          <p>{selectedScenario.description}</p>
+
+          <div className="ts-config-tags">
+            <span>
+              <Target size={14} />
+              {selectedScenario.id}
+            </span>
+
+            <span>
+              <Server size={14} />
+              {formatTarget(selectedScenario.target)}
+            </span>
+
+            <span>
+              <Radio size={14} />
+              10.10.10.60
+            </span>
           </div>
         </div>
 
-        <div className="strategy-grid">
+        <div className="ts-selected-severity">
+          <span>THREAT LEVEL</span>
+          <strong className={String(selectedScenario.severity).toLowerCase()}>
+            {selectedScenario.severity}
+          </strong>
+        </div>
+
+      </section>
+
+      {/* EXECUTION CONTROLS */}
+
+      <section className="ts-controls">
+
+        <div>
+          <div className="ts-section-label">03 / ENGINE CONTROL</div>
+          <h3>Execute Simulation</h3>
+          <p>Submit the selected scenario to the backend.</p>
+        </div>
+
+        <div className="ts-control-buttons">
+
           <button
-            className={`strategy-card ${
-              strategy === "full" ? "active" : ""
-            }`}
-            onClick={() => {
-              setStrategy("full");
-              setResult(null);
-            }}
+            type="button"
+            className="ts-run-button"
+            onClick={runSimulation}
             disabled={isRunning}
           >
-            <div className="strategy-icon">
-              <Lock size={23} />
-            </div>
-
-            <h3>Full Isolation</h3>
-
-            <p>
-              Simulates completely isolating the selected component.
-              This model assumes greater service disruption.
-            </p>
-
-            <span className="strategy-label">Higher disruption</span>
+            {isRunning ? (
+              <>
+                <LoaderCircle size={19} className="ts-spinner" />
+                Executing...
+              </>
+            ) : (
+              <>
+                <Play size={19} />
+                Run Threat Simulation
+              </>
+            )}
           </button>
 
           <button
-            className={`strategy-card ${
-              strategy === "selective" ? "active" : ""
-            }`}
-            onClick={() => {
-              setStrategy("selective");
-              setResult(null);
-            }}
+            type="button"
+            className="ts-reset-button"
+            onClick={resetSimulation}
             disabled={isRunning}
           >
-            <div className="strategy-icon">
-              <ShieldCheck size={23} />
-            </div>
-
-            <h3>Selective Restrictions</h3>
-
-            <p>
-              Simulates restricting selected connections while
-              maintaining essential fictional services.
-            </p>
-
-            <span className="strategy-label">Service continuity focus</span>
+            <RotateCcw size={17} />
+            Reset Results
           </button>
+
         </div>
       </section>
 
-      {/* Simulation controls */}
+      {/* EXECUTION ERROR */}
 
-      <div className="simulation-controls">
-        <button
-          className="run-simulation-btn"
-          onClick={runSimulation}
-          disabled={isRunning}
-        >
-          {isRunning ? (
-            <>
-              <span className="simulation-spinner"></span>
-              Running Simulation...
-            </>
-          ) : (
-            <>
-              <Play size={18} />
-              Run Simulation
-            </>
-          )}
-        </button>
+      {error && (
+        <div className="ts-error">
+          <AlertTriangle size={21} />
+          <div>
+            <strong>Simulation Failed</strong>
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
 
-        <button
-          className="reset-simulation-btn"
-          onClick={resetSimulation}
-          disabled={isRunning}
-        >
-          <RotateCcw size={17} />
-          Reset
-        </button>
-      </div>
+      {/* LOADING STATE */}
 
-      {/* Results */}
+      {isRunning && (
+        <div className="ts-loading">
+          <LoaderCircle size={27} className="ts-spinner" />
+          <div>
+            <strong>Executing Defence Engine</strong>
+            <p>
+              Processing scenario and awaiting the backend response...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* RESULTS */}
 
       {result && (
-        <section className="simulation-results">
-          <div className="section-heading">
+        <section className="ts-results">
+
+          <div className="ts-section-heading">
             <div>
+              <div className="ts-section-label">04 / BACKEND RESPONSE</div>
               <h2>Simulation Results</h2>
-              <p>Illustrative outcome for the selected scenario.</p>
+              <p>
+                Actual incident data returned by the GREYZONE backend.
+              </p>
             </div>
 
-            <span className="result-success">
+            <span className="ts-response-badge">
               <CheckCircle size={16} />
-              Completed
+              RESPONSE RECEIVED
             </span>
           </div>
 
-          <div className="result-summary">
-            <div className="result-card">
-              <div className="result-icon risk-icon">
-                <ShieldAlert size={22} />
+          {/* RESULT SUMMARY */}
+
+          <div className="ts-result-grid">
+
+            <div className="ts-result-card">
+              <div className="ts-result-card-top">
+                <span>THREAT SCORE</span>
+                <ShieldAlert size={21} />
               </div>
-              <p>Residual Risk Index</p>
-              <h2>{result.residualRisk}/100</h2>
-              <span>Illustrative risk score</span>
+
+              <strong className="ts-score">
+                {result.score ?? "—"}
+                <small>/100</small>
+              </strong>
+
+              <div className="ts-score-track">
+                <div
+                  style={{
+                    width: `${Math.max(
+                      0,
+                      Math.min(Number(result.score) || 0, 100)
+                    )}%`,
+                  }}
+                />
+              </div>
+
+              <p>
+                Severity: <b>{severity}</b>
+              </p>
             </div>
 
-            <div className="result-card">
-              <div className="result-icon disruption-icon">
-                <Zap size={22} />
+            <div className="ts-result-card">
+              <div className="ts-result-card-top">
+                <span>INCIDENT STATUS</span>
+                <ShieldCheck size={21} />
               </div>
-              <p>Disruption Index</p>
-              <h2>{result.disruption}/100</h2>
-              <span>Illustrative service impact</span>
+
+              <strong className="ts-status-value">
+                {formatLabel(result.status)}
+              </strong>
+
+              <p>Recorded backend incident status</p>
             </div>
+
+            <div className="ts-result-card">
+              <div className="ts-result-card-top">
+                <span>CONTAINMENT</span>
+                <Lock size={21} />
+              </div>
+
+              <strong className="ts-status-value">
+                {containment?.success === true
+                  ? "Successful"
+                  : containment?.success === false
+                    ? "Failed"
+                    : "Not Required"}
+              </strong>
+
+              <p>Python graph simulation result</p>
+            </div>
+
           </div>
 
-          <div className="result-details">
-            <h3>
-              <ShieldCheck size={19} />
-              Assessment Summary
-            </h3>
+          {/* DETECTION INFORMATION */}
 
-            <p>
-              The <strong>{result.strategy}</strong> strategy was
-              evaluated for the <strong>{selectedScenario.name}</strong>{" "}
-              scenario affecting <strong>{selectedScenario.target}</strong>.
-            </p>
+          <div className="ts-detail-grid">
 
-            <p>
-              The simulated residual risk is{" "}
-              <strong>{result.residualRisk}/100</strong>, while the
-              simulated disruption index is{" "}
-              <strong>{result.disruption}/100</strong>.
-            </p>
+            <article className="ts-detail-card">
+              <div className="ts-detail-heading">
+                <Activity size={19} />
+                <h3>Threat Detection</h3>
+              </div>
 
-            <div className="assessment-note">
-              <AlertTriangle size={18} />
-              These values are produced using illustrative formulas.
-              They are not validated cybersecurity measurements.
-            </div>
+              <p className="ts-reason">{result.reason || "No reason provided."}</p>
+
+              <div className="ts-data-list">
+                <div>
+                  <span>Incident ID</span>
+                  <strong>{result.id || "Unavailable"}</strong>
+                </div>
+
+                <div>
+                  <span>Event Type</span>
+                  <strong>{formatLabel(result.event_type)}</strong>
+                </div>
+
+                <div>
+                  <span>Source IP</span>
+                  <strong>{result.source_ip || "Unavailable"}</strong>
+                </div>
+
+                <div>
+                  <span>Target</span>
+                  <strong>{formatTarget(result.target)}</strong>
+                </div>
+
+                <div>
+                  <span>Timestamp</span>
+                  <strong>{formatTime(result.created_at)}</strong>
+                </div>
+              </div>
+            </article>
+
+            <article className="ts-detail-card">
+              <div className="ts-detail-heading">
+                <ShieldCheck size={19} />
+                <h3>Containment Analysis</h3>
+              </div>
+
+              {containment ? (
+                <div className="ts-data-list">
+                  <div>
+                    <span>Isolation Required</span>
+                    <strong>{containment.required ? "Yes" : "No"}</strong>
+                  </div>
+
+                  <div>
+                    <span>Isolation Attempted</span>
+                    <strong>{containment.attempted ? "Yes" : "No"}</strong>
+                  </div>
+
+                  <div>
+                    <span>Verification</span>
+                    <strong>
+                      {containment.success === true
+                        ? "Successful"
+                        : containment.success === false
+                          ? "Failed"
+                          : "Not Required"}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Isolated Node</span>
+                    <strong>{containment.isolated_node || "None"}</strong>
+                  </div>
+                </div>
+              ) : (
+                <p>Containment information unavailable.</p>
+              )}
+            </article>
+
           </div>
+
+          {/* BLOCKED PATHS */}
+
+          {containment && (
+            <article className="ts-detail-card ts-full-card">
+              <div className="ts-detail-heading">
+                <Network size={19} />
+                <h3>Blocked Network Paths</h3>
+                <span className="ts-inline-count">
+                  {blockedPaths.length} PATHS
+                </span>
+              </div>
+
+              {blockedPaths.length > 0 ? (
+                <div className="ts-path-grid">
+                  {blockedPaths.map((path, index) => (
+                    <div className="ts-path-item" key={index}>
+                      <span>{path[0]}</span>
+                      <ArrowRight size={17} />
+                      <span>{path[1]}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>No blocked paths recorded.</p>
+              )}
+            </article>
+          )}
+
+          {/* NETWORK VERIFICATION */}
+
+          {network && (
+            <article className="ts-detail-card ts-full-card">
+              <div className="ts-detail-heading">
+                <Network size={19} />
+                <h3>Network Reachability Analysis</h3>
+              </div>
+
+              <div className="ts-network-grid">
+                <div>
+                  <span>Affected Nodes</span>
+                  <strong>{affectedNodes.map(formatTarget).join(", ") || "None"}</strong>
+                </div>
+
+                <div>
+                  <span>Reachable Services</span>
+                  <strong>{reachableServices.map(formatTarget).join(", ") || "None"}</strong>
+                </div>
+
+                <div>
+                  <span>Unreachable Services</span>
+                  <strong>{unreachableServices.map(formatTarget).join(", ") || "None"}</strong>
+                </div>
+
+                <div>
+                  <span>Attacker Can Reach Target</span>
+                  <strong>
+                    {network.attacker_can_reach_target === undefined
+                      ? "Not Reported"
+                      : network.attacker_can_reach_target
+                        ? "Yes"
+                        : "No"}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Remaining Risk</span>
+                  <strong>
+                    {network.remaining_risk === undefined
+                      ? "Not Reported"
+                      : typeof network.remaining_risk === "boolean"
+                        ? network.remaining_risk
+                          ? "Present"
+                          : "Not Detected"
+                        : String(network.remaining_risk)}
+                  </strong>
+                </div>
+              </div>
+            </article>
+          )}
+
+          {/* DEFENCE ACTIONS */}
+
+          {result.actions?.length > 0 && (
+            <article className="ts-detail-card ts-full-card">
+              <div className="ts-detail-heading">
+                <CheckCircle size={19} />
+                <h3>Recorded Defence Actions</h3>
+              </div>
+
+              <div className="ts-action-list">
+                {result.actions.map((action, index) => (
+                  <div className="ts-action-item" key={action.id || index}>
+                    <CheckCircle size={17} />
+                    <div>
+                      <strong>{formatLabel(action.action_type)}</strong>
+                      <p>{action.details || action.status}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+          )}
+
+          {/* ALERTS */}
+
+          {result.alerts?.length > 0 && (
+            <article className="ts-detail-card ts-full-card">
+              <div className="ts-detail-heading">
+                <AlertTriangle size={19} />
+                <h3>Security Alerts</h3>
+              </div>
+
+              {result.alerts.map((alert, index) => (
+                <div className="ts-alert-item" key={alert.id || index}>
+                  <AlertTriangle size={17} />
+                  <span>{alert.message}</span>
+                </div>
+              ))}
+            </article>
+          )}
+
         </section>
       )}
 
-      {/* Disclaimer */}
+      {/* DISCLAIMER */}
 
-      <div className="simulation-disclaimer">
-        <AlertTriangle size={18} />
+      <footer className="ts-disclaimer">
+        <div className="ts-disclaimer-icon">
+          <Terminal size={20} />
+        </div>
 
         <div>
           <strong>Controlled Simulation Environment</strong>
           <p>
-            All scenarios, events, scores and outcomes are fictional
-            demonstration data. This module does not connect to or
-            control real network infrastructure.
+            Detection, network isolation and containment verification
+            are performed through the GREYZONE Python simulation engine.
+            Blocklist operations are virtual. No real network
+            infrastructure or operating-system firewall is controlled.
           </p>
         </div>
-      </div>
+      </footer>
+
     </div>
   );
 }

@@ -4,7 +4,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   FileText,
-  Settings,
   HelpCircle,
   Activity,
 } from "lucide-react";
@@ -53,12 +52,12 @@ function Sidebar({ activePage, setActivePage }) {
       </nav>
 
       <div className="sidebar-bottom">
-        <button className="nav-item">
-          <Settings size={19} />
-          <span>Settings</span>
-        </button>
-
-        <button className="nav-item">
+        <button
+          className={`nav-item ${
+            activePage === "Help & Support" ? "active" : ""
+          }`}
+          onClick={() => setActivePage("Help & Support")}
+        >
           <HelpCircle size={19} />
           <span>Help & Support</span>
         </button>

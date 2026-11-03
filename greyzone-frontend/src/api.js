@@ -1,106 +1,155 @@
-// ---------------------------------------------------------------------------
-// API layer. Components only ever call `api.*`, so switching from the mock to
-// the real Express backend is one env var:  VITE_USE_MOCK=false npm run dev
-//
-// Contract (agree this with Members 2, 3 and 4):
-//   GET  /api/network          -> { nodes:[{id,label,status}], edges:[{id,source,target,state}] }
-//        status: healthy | suspicious | isolated | at_risk      state: active | blocked
-//   GET  /api/incidents        -> [{ id, time, threat, node, action, severity, verified, reachable:[ids] }]
-//   POST /api/simulate/attack  -> body { target, type, leaveBackdoor }   (returns {ok:true})
-//   POST /api/reset            -> {ok:true}
-// ---------------------------------------------------------------------------
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
-async function http(path, opts = {}) {
-  const res = await fetch('/api' + path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-  });
-  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-  return res.json();
-}
+const DEFAULT_SOURCE_IP = "10.10.10.60";
 
-const real = {
-  getNetwork: () => http('/network'),
-  getIncidents: () => http('/incidents'),
-  attack: (body) => http('/simulate/attack', { method: 'POST', body: JSON.stringify(body) }),
-  reset: () => http('/reset', { method: 'POST' }),
-};
+// Actual scenarios supported by the Python defence engine.
+export const THREAT_SCENARIOS = [
+  {
+    id: "normal_traffic",
+    name: "Normal Traffic",
+    description: "Simulates legitimate network traffic.",
+    target: "demo-login",
+    severity: "Low",
+    icon: "activity",
+  },
+  {
+    id: "port_scan",
+    name: "Port Scan",
+    description: "Simulates suspicious port scanning activity.",
+    target: "web_server",
+    severity: "High",
+    icon: "scan",
+  },
+  {
+    id: "brute_force",
+    name: "Brute Force",
+    description: "Simulates repeated authentication attempts.",
+    target: "demo-login",
+    severity: "High",
+    icon: "shield-alert",
+  },
+  {
+    id: "ddos",
+    name: "DDoS Attack",
+    description: "Simulates a distributed denial-of-service attack.",
+    target: "web_server",
+    severity: "Critical",
+    icon: "zap",
+  },
+  {
+    id: "suspicious_login",
+    name: "Suspicious Login",
+    description: "Simulates suspicious authentication activity.",
+    target: "demo-login",
+    severity: "Medium",
+    icon: "user-x",
+  },
+  {
+    id: "malware_beacon",
+    name: "Malware Beacon",
+    description: "Simulates suspicious outbound beaconing activity.",
+    target: "app_server",
+    severity: "Critical",
+    icon: "bug",
+  },
+];
 
-// ------------------------------ Mock engine --------------------------------
-const fresh = () => ({
-  nodes: [
-    { id: 'bunker1', label: 'Bunker 1', status: 'healthy' },
-    { id: 'bunker2', label: 'Bunker 2', status: 'healthy' },
-    { id: 'bunker3', label: 'Bunker 3', status: 'healthy' },
-  ],
-  edges: [
-    { id: 'e12', source: 'bunker1', target: 'bunker2', state: 'active' },
-    { id: 'e13', source: 'bunker1', target: 'bunker3', state: 'active' },
-    { id: 'e23', source: 'bunker2', target: 'bunker3', state: 'active' },
-  ],
-  incidents: [],
-});
-let db = fresh();
+async function http(path, options = {}) {
+  let response;
 
-const THREATS = {
-  traffic_flood: 'Malicious traffic flood',
-  failed_logins: 'Repeated failed logins',
-};
-
-function reachableFrom(start) {
-  const seen = new Set([start]);
-  const queue = [start];
-  while (queue.length) {
-    const cur = queue.shift();
-    for (const e of db.edges) {
-      if (e.state !== 'active') continue;
-      const next = e.source === cur ? e.target : e.target === cur ? e.source : null;
-      if (next && !seen.has(next)) { seen.add(next); queue.push(next); }
-    }
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...options.headers,
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      "Cannot connect to GREYZONE backend. Check that the server is running on port 5000."
+    );
   }
-  seen.delete(start);
-  return [...seen];
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || `Backend request failed (${response.status})`
+    );
+  }
+
+  return data;
 }
 
-const mock = {
-  getNetwork: async () => structuredClone({ nodes: db.nodes, edges: db.edges }),
-  getIncidents: async () => structuredClone(db.incidents),
-  reset: async () => { db = fresh(); return { ok: true }; },
-  attack: async ({ target, type, leaveBackdoor }) => {
-    const node = db.nodes.find((n) => n.id === target);
-    if (!node || node.status !== 'healthy') return { ok: false };
-    node.status = 'suspicious';
+export const api = {
+  // Backend health and dashboard statistics
+  getHealth: () => http("/health"),
 
-    setTimeout(() => {
-      // Response rule: block every link touching the target. With
-      // leaveBackdoor, one link is "misconfigured" so verification fails.
-      let skipped = false;
-      db.edges.forEach((e) => {
-        if (e.source !== target && e.target !== target) return;
-        if (leaveBackdoor && !skipped) { skipped = true; return; }
-        e.state = 'blocked';
-      });
-      node.status = 'isolated';
+  getStatus: () => http("/status"),
 
-      const reachable = reachableFrom(target);
-      reachable.forEach((id) => { db.nodes.find((n) => n.id === id).status = 'at_risk'; });
+  // Incident management
+  getIncidents: async () => {
+    const data = await http("/incidents");
+    return data.incidents;
+  },
 
-      db.incidents.unshift({
-        id: Date.now(),
-        time: new Date().toISOString(),
-        threat: THREATS[type] ?? type,
-        node: target,
-        action: `Isolated ${node.label}: blocked its connections`,
-        severity: 'high',
-        verified: reachable.length === 0,
-        reachable,
-      });
-    }, 1500);
-    return { ok: true };
+  getIncident: async (id) => {
+    const data = await http(`/incidents/${encodeURIComponent(id)}`);
+    return data.incident;
+  },
+
+  // Attack scenario execution
+  runScenario: async ({
+    scenario,
+    sourceIp = DEFAULT_SOURCE_IP,
+    target,
+  }) => {
+    const data = await http("/scenarios", {
+      method: "POST",
+      body: JSON.stringify({
+        scenario,
+        sourceIp,
+        target,
+      }),
+    });
+
+    return data.incident;
+  },
+
+  // Custom event processing
+  submitEvent: async (event) => {
+    const data = await http("/events", {
+      method: "POST",
+      body: JSON.stringify(event),
+    });
+
+    return data.incident;
+  },
+
+  // Alert management
+  getAlerts: async () => {
+    const data = await http("/alerts");
+    return data.alerts;
+  },
+
+  acknowledgeAlert: (id) =>
+    http(`/alerts/${encodeURIComponent(id)}/acknowledge`, {
+      method: "PATCH",
+    }),
+
+  // Virtual blocklist
+  getBlockedSources: async () => {
+    const data = await http("/blocked-sources");
+    return data.blockedSources;
   },
 };
 
-export const api = USE_MOCK ? mock : real;
-export const THREAT_TYPES = THREATS;
+export const THREAT_TYPES = Object.freeze(
+  THREAT_SCENARIOS.reduce((types, scenario) => {
+    types[scenario.id] = scenario.name;
+    return types;
+  }, {})
+);
